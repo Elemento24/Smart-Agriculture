@@ -19,7 +19,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password, check_password
 from django.contrib.messages import constants as messages
 # Create your views here.
-
+import requests
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -72,11 +72,35 @@ def croprecommendation(request):
         N = request.POST['nitrogen']
         phosphorous = request.POST['phosphorous']
         potash = request.POST['potash']
-        temp = request.POST['temp']
-        humid = request.POST['humid']
+
         ph = request.POST['ph']
         rain = request.POST['rainfall']
+        city = request.POST['city']
 
+        def weather_fetch(city_name):
+            """
+            Fetch and returns the temperature and humidity of a city
+            :params: city_name
+            :return: temperature, humidity
+            """
+            api_key = "9d7cde1f6d07ec55650544be1631307e"
+            base_url = "http://api.openweathermap.org/data/2.5/weather?"
+
+            complete_url = base_url + "appid=" + api_key + "&q=" + city_name
+            response = requests.get(complete_url)
+            x = response.json()
+
+            if x["cod"] != "404":
+                y = x["main"]
+
+                temperature = round((y["temp"] - 273.15), 2)
+                humidity = y["humidity"]
+                return temperature, humidity
+            else:
+                return None
+
+        temp, humid = weather_fetch(city)
+        # print(temperatue, humidity)
         def predictedCropRecom(nitrogen, phosphorus, potash,
                                temp, humid, ph, rainfall):
 
@@ -143,17 +167,33 @@ def signup(request):
     if request.method == 'POST':
         name = request.POST['name']
         age = request.POST['age']
+        user_name = request.POST['username']
+        state = request.POST['state']
+        city = request.POST['city']
         repsw = request.POST['re-password']
         psw = request.POST['password']
+        try:
+            auth = user.objects.get(Username=user_name)
+        except user.DoesNotExist:
+            auth = None
+
+        if auth is not None:
+            message.add_message(request, messages.INFO, 'username exsits')
+            return render(request, 'signup.html')
+        try:
+            auth = User.objects.get(username=user_name)
+        except user.DoesNotExist:
+            auth = None
+        if auth is not None:
+            message.add_message(request, messages.INFO, 'username exsits')
+            return render(request, 'signup.html')
         if repsw != psw:
             message.add_message(request, messages.INFO, 'Paswword not matched')
             return render(request, 'signup.html')
-        username = request.POST['username']
-        state = request.POST['state']
-        city = request.POST['city']
-        User = user(Name=name, Username=username, Password=make_password(
+
+        user_ = user(Name=name, Username=user_name, Password=make_password(
             psw), Age=age, State=state, City=city)
-        User.save()
+        user_.save()
         return render(request, 'login.html')
     else:
         return render(request, 'signup.html')
